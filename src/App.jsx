@@ -35,6 +35,7 @@ function App() {
       return 'siliconflow';
     }
   });
+  const [apiChecking, setApiChecking] = useState(false);
 
   useEffect(() => {
     if (apiKey.trim()) localStorage.setItem(API_KEY_STORAGE, apiKey);
@@ -49,7 +50,18 @@ function App() {
       .then((r) => (r.ok ? r.json() : Promise.reject(r)))
       .then((d) => setApiStatus(d.keySet === true ? 'ok' : 'no-key'))
       .catch(() => setApiStatus('no-backend'));
-  }, [apiKey]);
+  }, []);
+
+  const handleConfirmApi = useCallback(() => {
+    setApiChecking(true);
+    const headers = { 'X-Provider': apiProvider };
+    if (apiKey.trim()) headers['X-Api-Key'] = apiKey.trim();
+    fetch('/api/health', { headers })
+      .then((r) => (r.ok ? r.json() : Promise.reject(r)))
+      .then((d) => setApiStatus(d.keySet === true ? 'ok' : 'no-key'))
+      .catch(() => setApiStatus('no-backend'))
+      .finally(() => setApiChecking(false));
+  }, [apiKey, apiProvider]);
 
   const initRoom = useCallback(() => {
     resetMindOnNewRoom();
@@ -126,6 +138,15 @@ function App() {
             autoComplete="off"
           />
         </label>
+        <button
+          type="button"
+          className="app-header__confirm-api"
+          onClick={handleConfirmApi}
+          disabled={apiChecking}
+          title="用当前厂商与 Key 验证并推给后端"
+        >
+          {apiChecking ? '验证中…' : '确认'}
+        </button>
         <button
           type="button"
           className="app-header__pause"
