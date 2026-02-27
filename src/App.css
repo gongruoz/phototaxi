@@ -72,6 +72,56 @@
   color: var(--warn-text);
 }
 
+.app-header__api-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.app-header__api-label {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.app-header__api-select {
+  font-size: 0.7rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text);
+  outline: none;
+  cursor: pointer;
+  min-width: 6rem;
+}
+
+.app-header__api-select:focus {
+  border-color: var(--border-focus);
+}
+
+.app-header__api-input {
+  width: 12rem;
+  max-width: 180px;
+  font-size: 0.7rem;
+  padding: 0.35rem 0.6rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-elevated);
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+
+.app-header__api-input::placeholder {
+  color: var(--text-subtle);
+}
+
+.app-header__api-input:focus {
+  border-color: var(--border-focus);
+}
+
 .app-header__pause {
   margin-left: auto;
   font-size: 0.75rem;

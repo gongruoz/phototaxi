@@ -15,17 +15,20 @@ const PRESET_PHASE_MS = 9000;
 const DIALOGUE_DECAY_MS = 8000;
 const NEAR_LIGHT_THRESHOLD = 0.5;
 
-async function fetchChat(messages, personalityPrompt = '') {
+async function fetchChat(messages, personalityPrompt = '', apiKey = '', apiProvider = 'siliconflow') {
   const prefix = personalityPrompt.trim()
     ? `【当前性格设定】${personalityPrompt.trim()}\n\n`
     : '';
   const adjusted = messages.map((m) =>
     m.role === 'user' ? { ...m, content: prefix + m.content } : m
   );
+  const headers = { 'Content-Type': 'application/json' };
+  if (apiKey) headers['X-Api-Key'] = apiKey;
+  if (apiProvider) headers['X-Provider'] = apiProvider;
   try {
     const r = await fetch('/api/chat', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ messages: adjusted, stream: false }),
     });
     if (!r.ok) {
@@ -42,10 +45,13 @@ async function fetchChat(messages, personalityPrompt = '') {
   }
 }
 
-async function fetchThought(stateText, personalityPrompt = '') {
+async function fetchThought(stateText, personalityPrompt = '', apiKey = '', apiProvider = 'siliconflow') {
   const prefix = personalityPrompt.trim()
     ? `【当前性格与行动设定】${personalityPrompt.trim()}\n\n`
     : '';
+  const headers = { 'Content-Type': 'application/json' };
+  if (apiKey) headers['X-Api-Key'] = apiKey;
+  if (apiProvider) headers['X-Provider'] = apiProvider;
   try {
     const messages = [
       {
@@ -55,7 +61,7 @@ async function fetchThought(stateText, personalityPrompt = '') {
     ];
     const r = await fetch('/api/chat', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ messages, stream: false }),
     });
     if (!r.ok) {
@@ -71,7 +77,7 @@ async function fetchThought(stateText, personalityPrompt = '') {
   }
 }
 
-export function useBotLogic({ room, bots, setBots, paused = false }) {
+export function useBotLogic({ room, bots, setBots, paused = false, apiKey = '', apiProvider = 'siliconflow' }) {
   const [thoughts, setThoughts] = useState(['', '']);
   const [dialogue, setDialogue] = useState([]);
   const [mindState, setMindState] = useState({});
@@ -82,9 +88,13 @@ export function useBotLogic({ room, bots, setBots, paused = false }) {
   const botsRef = useRef(bots);
   const roomRef = useRef(room);
   const personalityPromptsRef = useRef(personalityPrompts);
+  const apiKeyRef = useRef(apiKey);
+  const apiProviderRef = useRef(apiProvider);
   botsRef.current = bots;
   roomRef.current = room;
   personalityPromptsRef.current = personalityPrompts;
+  apiKeyRef.current = apiKey;
+  apiProviderRef.current = apiProvider;
   const [presetPhase, setPresetPhase] = useState(0);
 
   const tick = useCallback(() => {
@@ -136,7 +146,7 @@ export function useBotLogic({ room, bots, setBots, paused = false }) {
       const current = getLightAt(bot.x, bot.y, r.lights);
       const report = bot._lastStateReport || {};
       const stateText = `position (${Math.round(bot.x)}, ${Math.round(bot.y)}), light ${current.toFixed(2)}, state ${report.current_state || 'wandering'}, darkness ${report.time_in_darkness ?? 0}s, encounters ${report.encounters_count ?? 0}.`;
-      const thought = await fetchThought(stateText, personalityPromptsRef.current[index] ?? '');
+      const thought = await fetchThought(stateText, personalityPromptsRef.current[index] ?? '', apiKeyRef.current ?? '', apiProviderRef.current ?? 'siliconflow');
       setThoughts((t) => {
         const next = [...t];
         next[index] = (thought && thought.trim()) ? thought : (t[index] || '');
@@ -166,7 +176,9 @@ export function useBotLogic({ room, bots, setBots, paused = false }) {
       (async () => {
         const ai = await fetchChat(
           [{ role: 'user', content: '你是向光小兽，刚发现这边有光。用一句简短中文对同伴说一句话（10字以内）。只输出这句话，不要引号。' }],
-          personalityPromptsRef.current[0] ?? ''
+          personalityPromptsRef.current[0] ?? '',
+          apiKeyRef.current ?? '',
+          apiProviderRef.current ?? 'siliconflow'
         );
         setDialogue((d) => [...d.slice(-4), { from: 0, text: (ai && ai.trim()) ? ai : '这边有光，要过来吗？' }]);
       })();
@@ -175,7 +187,9 @@ export function useBotLogic({ room, bots, setBots, paused = false }) {
       (async () => {
         const ai = await fetchChat(
           [{ role: 'user', content: '你是向光小兽，刚发现这边很亮。用一句简短中文对同伴说一句话（10字以内）。只输出这句话，不要引号。' }],
-          personalityPromptsRef.current[1] ?? ''
+          personalityPromptsRef.current[1] ?? '',
+          apiKeyRef.current ?? '',
+          apiProviderRef.current ?? 'siliconflow'
         );
         setDialogue((d) => [...d.slice(-4), { from: 1, text: (ai && ai.trim()) ? ai : '这边很亮。' }]);
       })();
@@ -208,9 +222,12 @@ export function useBotLogic({ room, bots, setBots, paused = false }) {
       const isBoth = targetId === 'both';
       const targetLabel = isBoth ? '两只小兽' : `小兽${targetId}`;
       try {
+        const headers = { 'Content-Type': 'application/json' };
+        if (apiKeyRef.current) headers['X-Api-Key'] = apiKeyRef.current;
+        if (apiProviderRef.current) headers['X-Provider'] = apiProviderRef.current;
         const r = await fetch('/api/chat', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({
             messages: [
               {

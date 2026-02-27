@@ -5,18 +5,51 @@ import BotConsole from './components/BotConsole';
 import { useBotLogic, resetMindOnNewRoom } from './hooks/useBotLogic';
 import './App.css';
 
+const API_KEY_STORAGE = 'phototaxi_api_key';
+const API_PROVIDER_STORAGE = 'phototaxi_api_provider';
+
+const PROVIDER_OPTIONS = [
+  { value: 'siliconflow', label: '硅基流动' },
+  { value: 'openai', label: 'OpenAI' },
+  { value: 'groq', label: 'Groq' },
+  { value: 'gemini', label: 'Google Gemini' },
+  { value: 'claude', label: 'Anthropic Claude' },
+];
+
 function App() {
   const [room, setRoom] = useState(null);
   const [bots, setBots] = useState([]);
   const [apiStatus, setApiStatus] = useState(null); // null | 'ok' | 'no-key' | 'no-backend'
   const [paused, setPaused] = useState(false);
+  const [apiKey, setApiKey] = useState(() => {
+    try {
+      return typeof localStorage !== 'undefined' ? (localStorage.getItem(API_KEY_STORAGE) ?? '') : '';
+    } catch {
+      return '';
+    }
+  });
+  const [apiProvider, setApiProvider] = useState(() => {
+    try {
+      return typeof localStorage !== 'undefined' ? (localStorage.getItem(API_PROVIDER_STORAGE) ?? 'siliconflow') : 'siliconflow';
+    } catch {
+      return 'siliconflow';
+    }
+  });
 
   useEffect(() => {
-    fetch('/api/health')
+    if (apiKey.trim()) localStorage.setItem(API_KEY_STORAGE, apiKey);
+  }, [apiKey]);
+  useEffect(() => {
+    localStorage.setItem(API_PROVIDER_STORAGE, apiProvider);
+  }, [apiProvider]);
+
+  useEffect(() => {
+    const headers = { ...(apiKey.trim() ? { 'X-Api-Key': apiKey.trim() } : {}), 'X-Provider': apiProvider };
+    fetch('/api/health', { headers })
       .then((r) => (r.ok ? r.json() : Promise.reject(r)))
       .then((d) => setApiStatus(d.keySet === true ? 'ok' : 'no-key'))
       .catch(() => setApiStatus('no-backend'));
-  }, []);
+  }, [apiKey]);
 
   const initRoom = useCallback(() => {
     resetMindOnNewRoom();
@@ -40,7 +73,7 @@ function App() {
     setBots((prev) => prev.map((b, i) => (i === index ? { ...b, x: pos.x, y: pos.y } : b)));
   }, []);
 
-  const { thoughts, dialogue, liveThoughts, mindState, setModulationOverride, clearModulationOverride, personalityPrompts, setPersonalityPromptForBot, applyUserMessage } = useBotLogic({ room, bots, setBots, paused });
+  const { thoughts, dialogue, liveThoughts, mindState, setModulationOverride, clearModulationOverride, personalityPrompts, setPersonalityPromptForBot, applyUserMessage } = useBotLogic({ room, bots, setBots, paused, apiKey: apiKey?.trim() || undefined, apiProvider });
 
   const getThought = useCallback(
     (index) => (thoughts[index] && thoughts[index].trim()) ? thoughts[index] : (liveThoughts[index] ?? ''),
@@ -69,6 +102,30 @@ function App() {
             AI 已连接
           </span>
         )}
+        <label className="app-header__api-wrap" title="选择厂商后填写对应 API Key">
+          <span className="app-header__api-label">厂商</span>
+          <select
+            className="app-header__api-select"
+            value={apiProvider}
+            onChange={(e) => setApiProvider(e.target.value)}
+            aria-label="API 厂商"
+          >
+            {PROVIDER_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+        </label>
+        <label className="app-header__api-wrap" title="对应厂商的 API Key，可选">
+          <span className="app-header__api-label">API Key</span>
+          <input
+            type="password"
+            className="app-header__api-input"
+            placeholder="可选，未填则用 .env 或仅预设"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            autoComplete="off"
+          />
+        </label>
         <button
           type="button"
           className="app-header__pause"
