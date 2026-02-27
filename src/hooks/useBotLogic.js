@@ -221,6 +221,22 @@ export function useBotLogic({ room, bots, setBots, paused = false, apiKey = '', 
       if (!trimmed) return;
       const isBoth = targetId === 'both';
       const targetLabel = isBoth ? '两只小兽' : `小兽${targetId}`;
+
+      const applyPersonality = (description) => {
+        if (!description) return;
+        setPersonalityPrompts((prev) => {
+          const next = { ...prev };
+          const text = description.trim();
+          if (isBoth) {
+            next[0] = text;
+            next[1] = text;
+          } else {
+            next[targetId] = text;
+          }
+          return next;
+        });
+      };
+
       try {
         const headers = { 'Content-Type': 'application/json' };
         if (apiKeyRef.current) headers['X-Api-Key'] = apiKeyRef.current;
@@ -232,32 +248,25 @@ export function useBotLogic({ room, bots, setBots, paused = false, apiKey = '', 
             messages: [
               {
                 role: 'user',
-                content: `用户对${targetLabel}说：「${trimmed}」\n\n请回复两行。\n第一行：用50字以内中文描述它/它们接下来应表现的性格与行动倾向（例如：更胆小、更爱探索、更黏同伴、更懒、更谨慎等）。只写这一句描述，不要引号。\n第二行：三个0~1的数字，用空格分隔，分别表示 exploration_noise social_weight light_weight（例如 0.6 0.5 0.8）。若不需要改移动参数就写 - 。`,
+                content: `用户对${targetLabel}说：「${trimmed}」\n\n请严格按两行回复：\n第一行：用50字以内中文描述它/它们接下来应表现的性格与行动倾向（例如：更胆小、更爱探索、更黏同伴、更懒、更谨慎等）。只写这一句描述，不要引号、不要「第一行」等前缀。\n第二行：三个0~1的数字用空格分隔（exploration_noise social_weight light_weight），例如 0.6 0.5 0.8；若不改移动参数就只写一个 - 。`,
               },
             ],
             stream: false,
           }),
         });
-        if (!r.ok) return;
-        const data = await r.json();
+        let data = null;
+        if (r.ok) {
+          try {
+            data = await r.json();
+          } catch (_) {}
+        }
         const raw = data?.choices?.[0]?.message?.content?.trim?.() ?? '';
         const lines = raw.split(/\n/).map((s) => s.trim()).filter(Boolean);
-        const personality = lines[0] ?? '';
-        if (personality) {
-          setPersonalityPrompts((prev) => {
-            const next = { ...prev };
-            if (isBoth) {
-              next[0] = personality;
-              next[1] = personality;
-            } else {
-              next[targetId] = personality;
-            }
-            return next;
-          });
-        }
-        const second = lines[1];
-        if (second && second !== '-') {
-          const parts = second.split(/\s+/).map((p) => parseFloat(p));
+        const personalityFromApi = lines[0] ?? '';
+        applyPersonality(personalityFromApi || trimmed);
+
+        if (r.ok && lines[1] && lines[1] !== '-') {
+          const parts = lines[1].split(/\s+/).map((p) => parseFloat(p));
           if (parts.length >= 3 && parts.every((n) => Number.isFinite(n) && n >= 0 && n <= 1)) {
             const [exploration_noise, social_weight, light_weight] = parts;
             if (isBoth) {
@@ -270,6 +279,7 @@ export function useBotLogic({ room, bots, setBots, paused = false, apiKey = '', 
         }
       } catch (e) {
         console.warn('[applyUserMessage]', e?.message);
+        applyPersonality(trimmed);
       }
     },
     [setModulationOverride]
