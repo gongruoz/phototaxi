@@ -1,0 +1,11 @@
+# Render Blueprint: https://render.com/docs/blueprint-spec
+# Deploy: connect repo, or push and use Dashboard → New → Web Service
+services:
+  - type: web
+    name: phototaxi-sim
+    env: node
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
